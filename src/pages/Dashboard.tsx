@@ -30,10 +30,11 @@ const DATA = [
 ];
 
 export default function Dashboard() {
-  const { shipments, alerts } = useApp();
+  const { shipments, alerts, inquiries } = useApp();
   
   const activeShipments = shipments.filter(s => s.status !== "Delivered").length;
-  const onTimeRate = "94.2%"; // Mock calculation or derived from history
+  const pendingInquiries = inquiries.filter(i => i.status !== "Resolved").length;
+  const onTimeRate = "94.2%"; 
   
   const STATS = [
     { 
@@ -162,6 +163,13 @@ export default function Dashboard() {
               <div className="text-xs font-bold text-blue-800 uppercase tracking-wide">Predictive Maintenance</div>
               <p className="text-[12px] text-blue-700 mt-2 leading-relaxed">Truck #TX-2210 shows engine vibration anomaly. Scheduled check required in 48h.</p>
             </div>
+
+            {pendingInquiries > 0 && (
+              <div className="p-4 bg-red-50 rounded-xl border-l-4 border-red-400 transition-all hover:translate-x-1">
+                <div className="text-xs font-bold text-red-800 uppercase tracking-wide">Customer Support Alert</div>
+                <p className="text-[12px] text-red-700 mt-2 leading-relaxed">{pendingInquiries} inquiries are pending. AI Support Assistant has drafted solutions.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

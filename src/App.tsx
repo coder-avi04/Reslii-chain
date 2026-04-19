@@ -7,6 +7,7 @@ import Shipments from "./pages/Shipments";
 import OptimalRoutes from "./pages/OptimalRoutes";
 import Prediction from "./pages/Prediction";
 import Alerts from "./pages/Alerts";
+import Support from "./pages/Support";
 import Login from "./pages/Login";
 
 import { useApp } from "./context/AppContext";
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/routes" element={<AuthGuard><OptimalRoutes /></AuthGuard>} />
           <Route path="/prediction" element={<AuthGuard><Prediction /></AuthGuard>} />
           <Route path="/alerts" element={<AuthGuard><Alerts /></AuthGuard>} />
+          <Route path="/support" element={<AuthGuard><Support /></AuthGuard>} />
           
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

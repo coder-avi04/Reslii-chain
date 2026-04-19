@@ -1,9 +1,57 @@
 import React, { useState } from "react";
 import { Brain, Sparkles, TrendingUp, AlertCircle, RefreshCw, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { geminiService } from "@/services/geminiService";
 
 export default function AIStats() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [predictions, setPredictions] = useState([
+    { 
+      id: "SC-9421", 
+      route: "Singapore → Rotterdam", 
+      prediction: "4.5h Delay", 
+      confidence: 94, 
+      reason: "Severe weather patterns in Indian Ocean",
+      severity: "medium" as const
+    },
+    { 
+      id: "LA-7723", 
+      route: "Los Angeles → Tokyo", 
+      prediction: "12h Delay", 
+      confidence: 88, 
+      reason: "Labor dispute at Long Beach port escalation",
+      severity: "high" as const
+    },
+    { 
+      id: "TX-2210", 
+      route: "Austin → New York", 
+      prediction: "No Delay", 
+      confidence: 99, 
+      reason: "Route optimization suggests alternate highway paths",
+      severity: "low" as const
+    },
+  ]);
+
+  const handleSimulate = async () => {
+    setIsAnalyzing(true);
+    try {
+      const newPredictions = await Promise.all(predictions.map(async (p) => {
+        const result = await geminiService.predictDelay(p.route, p.reason);
+        return {
+          ...p,
+          prediction: result.prediction,
+          confidence: result.confidence,
+          reason: result.reason,
+          severity: result.confidence < 80 ? "high" as const : result.confidence < 95 ? "medium" as const : "low" as const
+        };
+      }));
+      setPredictions(newPredictions);
+    } catch (err) {
+      console.error("Simulation failed:", err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const stats = [
     { label: "Prediction Accuracy", value: "98.4%", icon: TrendingUp },
@@ -22,11 +70,9 @@ export default function AIStats() {
           <p className="text-slate-500 mt-1 font-medium italic">Predictive logistics intelligence powered by Gemini AI models.</p>
         </div>
         <button 
-          onClick={() => {
-            setIsAnalyzing(true);
-            setTimeout(() => setIsAnalyzing(false), 2000);
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2 active:scale-95"
+          onClick={handleSimulate}
+          disabled={isAnalyzing}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2 active:scale-95 disabled:opacity-50"
         >
           {isAnalyzing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
           Run Global Simulation
@@ -38,32 +84,7 @@ export default function AIStats() {
           <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
             <h2 className="text-xl font-bold text-slate-800 mb-8 border-b border-slate-100 pb-4">Active Risk Analysis</h2>
             <div className="space-y-4">
-              {[
-                { 
-                  id: "SC-9421", 
-                  route: "Singapore → Rotterdam", 
-                  prediction: "4.5h Delay", 
-                  confidence: 94, 
-                  reason: "Severe weather patterns in Indian Ocean",
-                  severity: "medium"
-                },
-                { 
-                  id: "LA-7723", 
-                  route: "Los Angeles → Tokyo", 
-                  prediction: "12h Delay", 
-                  confidence: 88, 
-                  reason: "Labor dispute at Long Beach port escalation",
-                  severity: "high"
-                },
-                { 
-                  id: "TX-2210", 
-                  route: "Austin → New York", 
-                  prediction: "No Delay", 
-                  confidence: 99, 
-                  reason: "Route optimization suggests alternate highway paths",
-                  severity: "low"
-                },
-              ].map((item) => (
+              {predictions.map((item) => (
                 <div key={item.id} className="bg-slate-50/50 border border-slate-100 rounded-2xl p-6 hover:border-blue-200 transition-all group hover:bg-blue-50/20">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-4">

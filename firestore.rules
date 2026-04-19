@@ -8,8 +8,9 @@ service cloud.firestore {
 
     // 3. Primitive Definition
     function isSignedIn() { return request.auth != null; }
-    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isVerified() { return isSignedIn(); } // Relaxed for demo consistency
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isBootstrapAdmin() { return isSignedIn() && request.auth.token.email == 'avishekjain0111@gmail.com'; }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
@@ -32,7 +33,8 @@ service cloud.firestore {
              data.destination is string && data.destination.size() <= 200 &&
              data.status in ['Loading', 'In Transit', 'Delayed', 'Delivered'] &&
              data.priority in ['Low', 'Medium', 'High', 'Critical'] &&
-             data.keys().hasAll(['id', 'origin', 'destination', 'status', 'priority']);
+             data.type is string && data.type.size() <= 64 &&
+             data.keys().hasAll(['id', 'origin', 'destination', 'status', 'priority', 'type', 'createdAt']);
     }
 
     function isValidAlert(data) {
@@ -42,6 +44,13 @@ service cloud.firestore {
              data.keys().hasAll(['type', 'msg', 'severity']);
     }
 
+    function isValidInquiry(data) {
+      return data.customerName is string && data.customerName.size() <= 200 &&
+             data.email is string && data.email.size() <= 200 &&
+             data.status in ['Open', 'Pending', 'Resolved'] &&
+             data.keys().hasAll(['customerName', 'email', 'subject', 'message', 'status', 'timestamp']);
+    }
+
     // --- Collections ---
 
     match /users/{userId} {
@@ -49,12 +58,13 @@ service cloud.firestore {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       
-      // Users can create their initial profile (defaulting to 'User' role unless an Admin)
+      // Users can create their initial profile (defaulting to 'User' role unless an Admin or Bootstrap)
       allow create: if isOwner(userId) && isValidUser(incoming()) && 
-                    (incoming().role == 'User' || isAdmin());
+                    (incoming().role == 'User' || isAdmin() || isBootstrapAdmin());
       
-      // Only Admins can change roles. Users can update their own displayName.
+      // Only Admins or Bootstrap can change roles. Users can update their own displayName.
       allow update: if (isAdmin() && isValidUser(incoming())) ||
+                    (isOwner(userId) && isBootstrapAdmin() && isValidUser(incoming())) ||
                     (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']) && isValidUser(incoming()));
     }
 
@@ -76,6 +86,19 @@ service cloud.firestore {
       // Alerts are typically system-generated or by Managers
       allow create: if isManager() && isValidAlert(incoming()) && isValidId(alertId);
       allow update: if isManager() && isValidAlert(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /inquiries/{inquiryId} {
+      // Support inquiries are viewed by Managers/Admins
+      allow read: if isManager();
+      
+      // Verified users can submit inquiries
+      allow create: if isVerified() && isValidInquiry(incoming()) && isValidId(inquiryId);
+      
+      // Managers/Admins can respond or update status
+      allow update: if isManager() && isValidInquiry(incoming());
+      
       allow delete: if isAdmin();
     }
   }

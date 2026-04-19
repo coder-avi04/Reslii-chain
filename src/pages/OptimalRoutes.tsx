@@ -1,8 +1,28 @@
-import React from "react";
-import { Map, Navigation, MapPin, Search, Plus, Filter, Info, ChevronRight, Route } from "lucide-react";
+import React, { useState } from "react";
+import { Map, Navigation, MapPin, Search, Plus, Filter, Info, ChevronRight, Route, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function OptimalRoutes() {
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [routeInfo, setRouteInfo] = useState<any>(null);
+  const [form, setForm] = useState({ origin: "Singapore", destination: "Rotterdam" });
+
+  const handleOptimize = async () => {
+    setIsOptimizing(true);
+    try {
+      const res = await fetch("/api/optimize-route", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+      const data = await res.json();
+      setRouteInfo(data);
+    } catch (err) {
+      console.error("Optimization failed:", err);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
   return (
     <div className="p-8 space-y-8 flex flex-col h-full">
       <div className="flex items-end justify-between shrink-0">
@@ -11,13 +31,29 @@ export default function OptimalRoutes() {
           <p className="text-gray-500 mt-1">Shortest path calculation and dynamic rerouting strategies.</p>
         </div>
         <div className="flex gap-3">
-          <button className="bg-white/5 border border-white/10 text-gray-300 px-4 py-2 rounded-md text-sm font-medium hover:text-white hover:bg-white/10 transition-all flex items-center gap-2">
-            <Filter className="w-4 h-4" />
-            Filters
-          </button>
-          <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-all shadow-lg shadow-orange-500/20 flex items-center gap-2">
-            <Route className="w-4 h-4" />
-            Optimize All
+          <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3">
+            <span className="text-[10px] font-bold text-slate-500 uppercase">From</span>
+            <input 
+              value={form.origin} 
+              onChange={e => setForm({...form, origin: e.target.value})}
+              className="bg-transparent text-sm text-white outline-none w-24"
+            />
+          </div>
+          <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3">
+            <span className="text-[10px] font-bold text-slate-500 uppercase">To</span>
+            <input 
+              value={form.destination} 
+              onChange={e => setForm({...form, destination: e.target.value})}
+              className="bg-transparent text-sm text-white outline-none w-24"
+            />
+          </div>
+          <button 
+            onClick={handleOptimize}
+            disabled={isOptimizing}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2 disabled:opacity-50"
+          >
+            {isOptimizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Route className="w-4 h-4" />}
+            Optimize Route
           </button>
         </div>
       </div>
@@ -79,11 +115,30 @@ export default function OptimalRoutes() {
                   <circle cx="480" cy="200" r="4" fill="#f97316" />
                 </svg>
 
-                <div className="absolute top-[20%] left-[25%] bg-[#1c1d21] border border-orange-500/30 p-2 rounded-lg text-xs shadow-2xl">
-                  <div className="text-orange-500 font-bold mb-1 uppercase tracking-tighter text-[10px]">Optimal Path Suggested</div>
-                  <div className="text-white">Diverting due to Storm Alpha</div>
-                  <div className="text-gray-500 mt-1 text-[9px] font-mono tracking-widest">+2.5 hours transit</div>
+            <div className="absolute top-[20%] left-[25%] bg-[#1c1d21] border border-blue-500/30 p-4 rounded-xl text-xs shadow-2xl z-20">
+              <div className="text-blue-500 font-bold mb-2 uppercase tracking-widest text-[10px] flex items-center gap-2">
+                <Navigation className="w-3 h-3" />
+                {routeInfo ? "Optimal Path Calculated" : "Standby for Parameters"}
+              </div>
+              <div className="text-white text-sm font-bold">
+                {routeInfo ? `${routeInfo.origin} → ${routeInfo.destination}` : "Select route to begin"}
+              </div>
+              {routeInfo && (
+                <div className="mt-3 space-y-2 border-t border-white/5 pt-3">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-slate-500">Distance</span>
+                    <span className="text-white font-mono">{routeInfo.stats.distance}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-slate-500">Proj. Duration</span>
+                    <span className="text-white font-mono">{routeInfo.stats.duration}</span>
+                  </div>
+                  <div className="text-emerald-500 font-bold mt-2 italic">
+                    "{routeInfo.recommendation}"
+                  </div>
                 </div>
+              )}
+            </div>
               </div>
             </div>
 

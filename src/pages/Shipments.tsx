@@ -1,11 +1,54 @@
 import React, { useState } from "react";
-import { Search, Plus, Filter, MoreHorizontal, Truck, MapPin, Calendar } from "lucide-react";
+import { Search, Plus, Filter, MoreHorizontal, Truck, MapPin, Calendar, X, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/context/AppContext";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db, handleFirestoreError } from "@/lib/firebase";
 
 export default function Shipments() {
   const { shipments } = useApp();
   const [searchTerm, setSearchTerm] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorHeader, setErrorHeader] = useState<string | null>(null);
+  const [newShipment, setNewShipment] = useState({
+    origin: "Singapore",
+    destination: "Los Angeles",
+    type: "Maritime",
+    priority: "Medium",
+  });
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setErrorHeader(null);
+    try {
+      const id = "SC-" + Math.floor(1000 + Math.random() * 9000);
+      await addDoc(collection(db, "shipments"), {
+        ...newShipment,
+        id,
+        status: "Loading",
+        eta: "TBD",
+        createdAt: serverTimestamp()
+      }).catch(err => handleFirestoreError(err, 'create', 'shipments'));
+      
+      setIsModalOpen(false);
+    } catch (err: any) {
+      console.error("Create failed:", err);
+      try {
+        const parsed = JSON.parse(err.message);
+        if (parsed.error.includes("insufficient permissions")) {
+          setErrorHeader("Access Denied: You must be a Manager or Admin to dispatch shipments.");
+        } else {
+          setErrorHeader("Sync Failure: Unable to connect to logistics cloud. Please verify connection.");
+        }
+      } catch {
+        setErrorHeader("An unexpected error occurred during dispatch.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const filteredShipments = shipments.filter(s => 
     s.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -23,11 +66,95 @@ export default function Shipments() {
           </h1>
           <p className="text-slate-500 mt-1 font-medium italic">Track and manage active logistics operations globally.</p>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2 active:scale-95">
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2 active:scale-95"
+        >
           <Plus className="w-4 h-4" />
           Create Shipment
         </button>
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden ring-1 ring-slate-100">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h2 className="text-lg font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                <Plus className="w-4 h-4 text-blue-600" />
+                Initialize Shipment
+              </h2>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreate} className="p-8 space-y-6">
+              {errorHeader && (
+                <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                  <p className="text-[11px] font-bold text-red-600 uppercase tracking-tight">{errorHeader}</p>
+                </div>
+              )}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Route Origin</label>
+                  <input 
+                    required
+                    value={newShipment.origin}
+                    onChange={e => setNewShipment({...newShipment, origin: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Final Destination</label>
+                  <input 
+                    required
+                    value={newShipment.destination}
+                    onChange={e => setNewShipment({...newShipment, destination: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Freight Type</label>
+                    <select 
+                      value={newShipment.type}
+                      onChange={e => setNewShipment({...newShipment, type: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all"
+                    >
+                      <option>Maritime</option>
+                      <option>Air Freight</option>
+                      <option>Ground</option>
+                      <option>Last Mile</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Priority</label>
+                    <select 
+                      value={newShipment.priority}
+                      onChange={e => setNewShipment({...newShipment, priority: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all"
+                    >
+                      <option>Low</option>
+                      <option>Medium</option>
+                      <option>High</option>
+                      <option>Critical</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <button 
+                disabled={isSubmitting}
+                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all shadow-xl shadow-blue-600/20 disabled:opacity-50"
+              >
+                {isSubmitting ? "Dispatching to AI Network..." : "Initialize Dispatch"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden transition-all">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between gap-4 bg-slate-50/50">

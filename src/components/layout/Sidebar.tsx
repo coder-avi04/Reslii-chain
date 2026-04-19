@@ -8,22 +8,27 @@ import {
   Bell, 
   Settings,
   LogOut,
-  ChevronRight
+  ChevronRight,
+  Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/context/AppContext";
 
-const NAVIGATION = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Shipments", href: "/shipments", icon: Truck },
-  { name: "Optimal Routes", href: "/routes", icon: Route },
-  { name: "AI Prediction", href: "/prediction", icon: Brain },
-  { name: "Alerts", href: "/alerts", icon: Bell },
-];
-
 export function Sidebar() {
   const location = useLocation();
   const { profile, logout } = useApp();
+
+  const menuItems = [
+    { name: "Dashboard", href: "/", icon: LayoutDashboard },
+    { name: "Shipments", href: "/shipments", icon: Truck },
+    { name: "Optimal Routes", href: "/routes", icon: Route },
+    { name: "AI Prediction", href: "/prediction", icon: Brain },
+    { name: "Alerts", href: "/alerts", icon: Bell },
+  ];
+
+  if (profile?.role === "Admin" || profile?.role === "Manager") {
+    menuItems.push({ name: "Support Intelligence", href: "/support", icon: Shield });
+  }
 
   return (
     <div className="w-64 h-full bg-slate-900 text-slate-400 flex flex-col border-r border-slate-800">
@@ -38,7 +43,7 @@ export function Sidebar() {
         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-3 pb-2">
           Main Management
         </div>
-        {NAVIGATION.map((item) => {
+        {menuItems.map((item) => {
           const isActive = location.pathname === item.href;
           return (
             <Link
