@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile including role-based access information.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["Admin", "Manager", "User"] },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    },
+    "Shipment": {
+      "title": "Shipment",
+      "description": "Logistics shipment data.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "origin": { "type": "string" },
+        "destination": { "type": "string" },
+        "status": { "type": "string", "enum": ["Loading", "In Transit", "Delayed", "Delivered"] },
+        "eta": { "type": "string", "format": "date" },
+        "type": { "type": "string" },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"] },
+        "currentLocation": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "origin", "destination", "status", "priority"]
+    },
+    "Alert": {
+      "title": "System Alert",
+      "description": "Critical incident or system notification.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "msg": { "type": "string" },
+        "time": { "type": "string", "format": "date-time" },
+        "severity": { "type": "string", "enum": ["low", "medium", "high"] },
+        "category": { "type": "string" },
+        "shipmentId": { "type": "string" }
+      },
+      "required": ["type", "msg", "severity"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Public and private user profile data."
+    },
+    "shipments/{shipmentId}": {
+      "schema": "Shipment",
+      "description": "Global shipment records."
+    },
+    "alerts/{alertId}": {
+      "schema": "Alert",
+      "description": "Real-time system alerts."
+    }
+  }
+}

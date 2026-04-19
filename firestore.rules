@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 3. Primitive Definition
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // Role-based helpers (Requires looking up the user profile)
+    function getUserData() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function isAdmin() { return isVerified() && getUserData().role == 'Admin'; }
+    function isManager() { return isVerified() && getUserData().role in ['Admin', 'Manager']; }
+
+    // 2. Validation Blueprints
+    function isValidUser(data) {
+      return data.email is string && data.email.size() <= 200 &&
+             data.role in ['Admin', 'Manager', 'User'] &&
+             data.keys().hasAll(['email', 'role']) && data.keys().size() >= 2;
+    }
+
+    function isValidShipment(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.origin is string && data.origin.size() <= 200 &&
+             data.destination is string && data.destination.size() <= 200 &&
+             data.status in ['Loading', 'In Transit', 'Delayed', 'Delivered'] &&
+             data.priority in ['Low', 'Medium', 'High', 'Critical'] &&
+             data.keys().hasAll(['id', 'origin', 'destination', 'status', 'priority']);
+    }
+
+    function isValidAlert(data) {
+      return data.type is string && data.type.size() <= 64 &&
+             data.msg is string && data.msg.size() <= 1000 &&
+             data.severity in ['low', 'medium', 'high'] &&
+             data.keys().hasAll(['type', 'msg', 'severity']);
+    }
+
+    // --- Collections ---
+
+    match /users/{userId} {
+      // Users can only read their own profile, Admins can read all.
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      
+      // Users can create their initial profile (defaulting to 'User' role unless an Admin)
+      allow create: if isOwner(userId) && isValidUser(incoming()) && 
+                    (incoming().role == 'User' || isAdmin());
+      
+      // Only Admins can change roles. Users can update their own displayName.
+      allow update: if (isAdmin() && isValidUser(incoming())) ||
+                    (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']) && isValidUser(incoming()));
+    }
+
+    match /shipments/{shipmentId} {
+      // All verified users can view shipments (read-only monitoring)
+      allow read: if isVerified();
+      
+      // Only Managers or Admins can modify shipment data
+      allow create: if isManager() && isValidShipment(incoming()) && isValidId(shipmentId);
+      allow update: if isManager() && isValidShipment(incoming()) &&
+                    incoming().id == existing().id; // Immutable ID
+      allow delete: if isAdmin();
+    }
+
+    match /alerts/{alertId} {
+      // All verified users can view alerts
+      allow read: if isVerified();
+      
+      // Alerts are typically system-generated or by Managers
+      allow create: if isManager() && isValidAlert(incoming()) && isValidId(alertId);
+      allow update: if isManager() && isValidAlert(incoming());
+      allow delete: if isAdmin();
+    }
+  }
+}
