@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useApp } from "@/context/AppContext";
 import { geminiService } from "@/services/geminiService";
+import { apiService } from "@/services/apiService";
 import { updateDoc, doc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -78,16 +79,12 @@ export default function Support() {
     if (!selectedInquiry || !aiDraft) return;
     setIsSending(true);
     try {
-      // Simulate sending email via API
-      await fetch("/api/send-support-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: selectedInquiry.email,
-          subject: `RE: ${selectedInquiry.subject}`,
-          body: aiDraft
-        })
-      });
+      // Send email via structured backend API
+      await apiService.sendEmail(
+        selectedInquiry.email,
+        `RE: ${selectedInquiry.subject}`,
+        aiDraft
+      );
 
       // Update inquiry status
       const inquiryRef = doc(db, "inquiries", selectedInquiry.id);

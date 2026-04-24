@@ -2,9 +2,16 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
+import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize Gemini securely with direct process.env access
+const googleAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 async function startServer() {
   const app = express();
@@ -17,14 +24,41 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  // AI Prediction Route
+  app.post("/api/ai/predict-delay", async (req, res) => {
+    const { route, details } = req.body;
+    try {
+      const response = await googleAI.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: `Analyze route ${route} with details: ${details}. Predict delay and confidence in JSON format: { "prediction": string, "confidence": number, "reason": string }`,
+      });
+      res.json(JSON.parse(response.text));
+    } catch (error) {
+      console.error("AI Delay Prediction Error:", error);
+      res.status(500).json({ error: "Failed to generate prediction" });
+    }
+  });
+
+  // AI Support Reply Route
+  app.post("/api/ai/generate-reply", async (req, res) => {
+    const { customerName, message, shipmentStatus } = req.body;
+    try {
+      const response = await googleAI.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: `Generate support reply for ${customerName} inquiring about ${message}. Status: ${shipmentStatus || "Unknown"}.`,
+      });
+      res.json({ reply: response.text });
+    } catch (error) {
+      console.error("AI Support Error:", error);
+      res.status(500).json({ error: "Failed to generate support reply" });
+    }
+  });
+
   // Simulated Email Dispatch API
   app.post("/api/send-support-email", (req, res) => {
     const { to, subject, body } = req.body;
-    console.log(`[MAILER] Sending email to: ${to}`);
-    console.log(`[MAILER] Subject: ${subject}`);
-    console.log(`[MAILER] Body: ${body.substring(0, 100)}...`);
-    
-    // Simulate network delay
+    console.log(`[MAILER] Dispatching communication to: ${to}`);
+    // Simulate real mail server delay
     setTimeout(() => {
       res.json({ success: true, messageId: "MSG-" + Math.random().toString(36).substr(2, 6).toUpperCase() });
     }, 1000);

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Map, Navigation, MapPin, Search, Plus, Filter, Info, ChevronRight, Route, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiService } from "@/services/apiService";
 
 export default function OptimalRoutes() {
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -10,12 +11,7 @@ export default function OptimalRoutes() {
   const handleOptimize = async () => {
     setIsOptimizing(true);
     try {
-      const res = await fetch("/api/optimize-route", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
-      });
-      const data = await res.json();
+      const data = await apiService.optimizeRoute(form.origin, form.destination);
       setRouteInfo(data);
     } catch (err) {
       console.error("Optimization failed:", err);
