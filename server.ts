@@ -28,11 +28,17 @@ async function startServer() {
   app.post("/api/ai/predict-delay", async (req, res) => {
     const { route, details } = req.body;
     try {
-      const response = await googleAI.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: `Analyze route ${route} with details: ${details}. Predict delay and confidence in JSON format: { "prediction": string, "confidence": number, "reason": string }`,
-      });
-      res.json(JSON.parse(response.text));
+      const model = googleAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = `Analyze logistics route: ${route}. \nContext/Details: ${details}. \nProvide a prediction of delay, confidence level, and detailed reason in JSON format. Use fields: prediction, confidence (number), reason.`;
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text();
+      
+      // Basic JSON cleanup if needed
+      text = text.replace(/```json|```/g, "").trim();
+      
+      res.json(JSON.parse(text));
     } catch (error) {
       console.error("AI Delay Prediction Error:", error);
       res.status(500).json({ error: "Failed to generate prediction" });
@@ -41,16 +47,46 @@ async function startServer() {
 
   // AI Support Reply Route
   app.post("/api/ai/generate-reply", async (req, res) => {
-    const { customerName, message, shipmentStatus } = req.body;
+    const { customerName, inquiry, shipmentStatus } = req.body;
     try {
-      const response = await googleAI.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: `Generate support reply for ${customerName} inquiring about ${message}. Status: ${shipmentStatus || "Unknown"}.`,
-      });
-      res.json({ reply: response.text });
+      const model = googleAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = `Generate a professional, high-tech supply chain support response for customer "${customerName}". 
+      They are asking about: "${inquiry}". 
+      Current Shipment Status: "${shipmentStatus || "In Transit"}". 
+      The tone should be "Resilient, technical yet empathetic, and reassuring".`;
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      res.json({ reply: response.text() });
     } catch (error) {
       console.error("AI Support Error:", error);
       res.status(500).json({ error: "Failed to generate support reply" });
+    }
+  });
+
+  // AI Executive Summary Route
+  app.post("/api/ai/generate-summary", async (req, res) => {
+    const { data } = req.body;
+    try {
+      const model = googleAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = `You are the Lead Intelligence Officer at ResiliChain. 
+      Generate a concise, high-impact Executive Operational Report based on the following data:
+      ${JSON.stringify(data, null, 2)}
+      
+      The report should include:
+      1. Operational Status Summary
+      2. Critical Risk Assessment
+      3. Strategic Recommendations
+      4. Efficiency KPIs
+      
+      Keep it professional, data-driven, and technical.`;
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      res.json({ summary: response.text() });
+    } catch (error) {
+      console.error("AI Reporting Error:", error);
+      res.status(500).json({ error: "Failed to generate executive summary" });
     }
   });
 

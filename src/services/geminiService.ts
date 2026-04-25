@@ -1,36 +1,61 @@
-import { apiService } from "./apiService";
-
-/**
- * ResiliChain AI Intelligence Service (Client Proxy)
- * Delegates all AI operations to the backend to protect API keys and ensure operational security.
- */
 export const geminiService = {
   /**
-   * Predicts potential logistics delays based on route and environmental factors.
+   * Predicts potential logistics delays using Gemini Intelligence via server API.
    */
   predictDelay: async (route: string, details: string) => {
     try {
-      return await apiService.predictDelay(route, details);
+      const response = await fetch("/api/ai/predict-delay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ route, details })
+      });
+      if (!response.ok) throw new Error("API failure");
+      return await response.json();
     } catch (error) {
-      console.error("Backend AI Prediction Error:", error);
+      console.error("Gemini Prediction Proxy Error:", error);
       return {
-        prediction: "Variable Delay",
-        confidence: 70,
-        reason: "Network volatility prevented high-fidelity simulation. Defaulting to historical averages."
+        prediction: "Variable Congestion",
+        confidence: 65,
+        reason: "Intelligence systems are recalibrating. Defaulting to historical route heuristics."
       };
     }
   },
 
   /**
-   * Generates empathetic and smart support drafts for customer inquiries.
+   * Generates empathetic AI support strategies via server API.
    */
-  generateSupportReply: async (customerName: string, inquiry: string, shipmentStatus?: string) => {
+  generateSupportReply: async (customerName: string, inquiry: string, shipmentStatus: string = "In Transit") => {
     try {
-      const { reply } = await apiService.generateSupportReply(customerName, inquiry, shipmentStatus || "Standard Transit");
-      return reply;
+      const response = await fetch("/api/ai/generate-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerName, inquiry, shipmentStatus })
+      });
+      if (!response.ok) throw new Error("API failure");
+      const data = await response.json();
+      return data.reply;
     } catch (error) {
-      console.error("Backend AI Support Error:", error);
-      return "Thank you for contacting ResiliChain. Our human operators are reviewing your complex case now.";
+      console.error("Gemini Support Proxy Error:", error);
+      return "Logistics systems are briefly offline. Your inquiry has been prioritized for immediate human review.";
+    }
+  },
+
+  /**
+   * Generates an Executive Operational Report via server API.
+   */
+  generateExecutiveSummary: async (data: any) => {
+    try {
+      const response = await fetch("/api/ai/generate-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data })
+      });
+      if (!response.ok) throw new Error("API failure");
+      const result = await response.json();
+      return result.summary;
+    } catch (error) {
+      console.error("Gemini Reporting Proxy Error:", error);
+      return "System Alert: Executive Intelligence Engine is undergoing scheduled maintenance. Please review raw dashboard metrics.";
     }
   }
 };

@@ -9,25 +9,43 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900;
+    @apply bg-slate-50 text-slate-800 font-sans selection:bg-blue-600/20 selection:text-blue-900;
+  }
+
+  /* Technical Monospace Micro-details */
+  .mono-label {
+    @apply font-mono text-[10px] font-black uppercase tracking-[0.2em] text-slate-400;
   }
 }
 
-/* Custom scrollbar for lighter professional dashboard */
+/* Animations for "Live" feeling */
+@keyframes dash {
+  from { stroke-dashoffset: 200; }
+  to { stroke-dashoffset: 0; }
+}
+
+.animate-dash {
+  animation: dash 20s linear infinite;
+}
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-
 ::-webkit-scrollbar-track {
-  background: #f8fafc;
+  @apply bg-slate-50;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
-  border-radius: 10px;
+  @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
+/* Utility classes for technical dashboard */
+.resilience-grid {
+  background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+.glow-blue {
+    box-shadow: 0 0 15px rgba(37, 99, 235, 0.15);
 }

@@ -6,6 +6,18 @@ import firebaseConfig from '../../firebase-applet-config.json';
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+import { getDocFromServer, doc } from 'firebase/firestore';
+
+// Connection Integrity Check
+async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, '_connection_test_', 'ping'));
+    console.log("Firebase Connectivity: Verified");
+  } catch (error) {
+    console.error("Firebase Connectivity Error:", error);
+  }
+}
+testConnection();
 
 export interface FirestoreErrorInfo {
   error: string;

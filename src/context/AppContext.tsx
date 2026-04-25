@@ -4,7 +4,8 @@ import {
   User as FirebaseUser,
   signInWithPopup,
   GoogleAuthProvider,
-  signOut
+  signOut,
+  signInAnonymously
 } from "firebase/auth";
 import { 
   doc, 
@@ -64,6 +65,7 @@ interface AppContextType {
   inquiries: SupportInquiry[];
   loading: boolean;
   login: () => Promise<void>;
+  loginWithCredentials: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -78,11 +80,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Safety hatch: don't stay in loading state forever if firebase hangs
+    const safetyTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn("Auth sync hardware timeout reached. Forcing UI transition.");
+        setLoading(false);
+      }
+    }, 8000);
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("Auth State Signal Received:", firebaseUser ? "Authenticated" : "Unauthenticated");
       setUser(firebaseUser);
+      setLoading(true);
+      
       if (firebaseUser) {
         try {
-          // Sync user profile
+          const isDemoAdmin = sessionStorage.getItem("demo_admin") === "true";
+          
+          if (isDemoAdmin && firebaseUser.isAnonymous) {
+            console.log("Demo Admin session detected. Bypassing Firestore sync.");
+            setProfile({
+              uid: firebaseUser.uid,
+              email: "admin@resilichain.ai",
+              role: "Admin",
+              displayName: "Intelligence Operator (Demo)"
+            });
+            setLoading(false);
+            return;
+          }
+
           const userDoc = doc(db, "users", firebaseUser.uid);
           const snapshot = await getDoc(userDoc);
           
@@ -93,18 +119,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const newProfile: UserProfile = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || "",
-              role: isOwnerEmail ? "Admin" : "Manager",
+              role: isOwnerEmail ? "Admin" : "User",
               displayName: firebaseUser.displayName || "Anonymous"
             };
-            await setDoc(userDoc, {
-              ...newProfile,
-              createdAt: new Date().toISOString(),
-              emailVerified: firebaseUser.emailVerified
-            });
+            try {
+              await setDoc(userDoc, {
+                ...newProfile,
+                createdAt: new Date().toISOString(),
+                emailVerified: firebaseUser.emailVerified
+              });
+            } catch (e) {
+              console.warn("Profile creation blocked by rules (expected for anonymous):", e);
+            }
             setProfile(newProfile);
           } else {
             const data = snapshot.data() as UserProfile;
-            // Force owner to Admin if they are currently a User or Manager
             if (isOwnerEmail && data.role !== "Admin") {
               await updateDoc(userDoc, { role: "Admin" });
               setProfile({ ...data, role: "Admin" });
@@ -114,7 +143,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         } catch (error) {
           console.error("Profile Sync Error:", error);
-          // Fallback profile if Firestore is restricted
           setProfile({
             uid: firebaseUser.uid,
             email: firebaseUser.email || "",
@@ -124,12 +152,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else {
         setProfile(null);
+        sessionStorage.removeItem("demo_admin");
       }
-      // Always clear loading after auth/profile check completes
       setLoading(false);
+      clearTimeout(safetyTimeout);
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      unsubscribeAuth();
+      clearTimeout(safetyTimeout);
+    };
   }, []);
 
   useEffect(() => {
@@ -178,6 +210,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await signInWithPopup(auth, provider);
   };
 
+  const loginWithCredentials = async (email: string, pass: string) => {
+    if (email === "admin" && pass === "admin") {
+      setLoading(true);
+      sessionStorage.setItem("demo_admin", "true");
+      // Sign in anonymously to provide a valid Firebase Auth session
+      await signInAnonymously(auth);
+      // Profile will be set by the detected session storage in onAuthStateChanged
+      return;
+    }
+    // Fallback to prompting Google login
+    await login();
+  };
+
   const logout = async () => {
     await signOut(auth);
   };
@@ -191,6 +236,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       inquiries,
       loading,
       login,
+      loginWithCredentials,
       logout
     }}>
       {children}

@@ -18,6 +18,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/context/AppContext";
+import { geminiService } from "@/services/geminiService";
+import { motion, AnimatePresence } from "motion/react";
+import { FileText, X, Loader2 } from "lucide-react";
 
 const DATA = [
   { name: "Mon", trips: 45, delayed: 2 },
@@ -31,11 +34,35 @@ const DATA = [
 
 export default function Dashboard() {
   const { shipments, alerts, inquiries } = useApp();
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const [report, setReport] = React.useState<string | null>(null);
   
   const activeShipments = shipments.filter(s => s.status !== "Delivered").length;
   const pendingInquiries = inquiries.filter(i => i.status !== "Resolved").length;
   const onTimeRate = "94.2%"; 
   
+  const handleGenerateReport = async () => {
+    setIsGenerating(true);
+    try {
+      const dashboardState = {
+        metrics: {
+          activeShipments,
+          onTimeRate,
+          activeDisruptions: alerts.filter(a => a.severity === "high").length,
+          pendingSupport: pendingInquiries
+        },
+        recentTrends: DATA
+      };
+
+      const summary = await geminiService.generateExecutiveSummary(dashboardState);
+      setReport(summary);
+    } catch (error) {
+      console.error("Report Generation Error:", error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const STATS = [
     { 
       label: "Active Shipments", 
@@ -87,31 +114,92 @@ export default function Dashboard() {
             <option>Last 30 Days</option>
             <option>Last Quarter</option>
           </select>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-semibold transition-all cursor-pointer shadow-md shadow-blue-600/10 active:scale-[0.98]">
-            Generate Report
+          <button 
+            disabled={isGenerating}
+            onClick={handleGenerateReport}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2 rounded-md text-sm font-semibold transition-all cursor-pointer shadow-md shadow-blue-600/10 active:scale-[0.98] flex items-center gap-2"
+          >
+            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+            {isGenerating ? "Analyzing..." : "Generate Report"}
           </button>
         </div>
       </div>
 
+      <AnimatePresence>
+        {report && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden flex flex-col border border-slate-200"
+            >
+              <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <FileText className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-800">Intelligence Report</h2>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ResiliChain // Executive Briefing</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setReport(null)}
+                  className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-8 prose prose-slate max-w-none prose-sm prose-headings:font-black prose-headings:uppercase prose-headings:tracking-widest prose-headings:text-[11px] prose-headings:text-blue-600">
+                <div className="font-mono text-xs whitespace-pre-wrap leading-relaxed text-slate-600">
+                  {report}
+                </div>
+              </div>
+
+              <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button 
+                  onClick={() => window.print()}
+                  className="px-6 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Export PDF
+                </button>
+                <button 
+                  onClick={() => setReport(null)}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-colors"
+                >
+                  Acknowledge
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {STATS.map((stat) => (
-          <div key={stat.label} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-between group hover:border-slate-300 transition-all">
+          <div key={stat.label} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-between group hover:border-slate-300 transition-all hover:shadow-md">
             <div>
-              <div className="text-xs font-bold text-slate-500 uppercase tracking-tight mb-2 flex items-center justify-between">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 flex items-center justify-between border-b border-slate-50 pb-1">
                 {stat.label}
-                <stat.icon className={cn("w-4 h-4 opacity-40 group-hover:opacity-100 transition-opacity", stat.color)} />
+                <stat.icon className={cn("w-3.5 h-3.5 opacity-40 group-hover:opacity-100 transition-opacity", stat.color)} />
               </div>
-              <div className="text-3xl font-bold text-slate-800 leading-none">{stat.value}</div>
+              <div className="text-3xl font-black text-slate-800 leading-none font-mono tracking-tighter">{stat.value}</div>
             </div>
             
             <div className={cn(
-              "flex items-center gap-1 text-[11px] mt-4 font-semibold tracking-wide",
+              "flex items-center gap-1 text-[10px] mt-4 font-black tracking-[0.1em] uppercase",
               stat.trend === "up" ? "text-emerald-600" : stat.trend === "down" ? "text-amber-600" : "text-slate-400"
             )}>
               {stat.trend === "up" && <ArrowUpRight className="w-3 h-3" />}
               {stat.trend === "down" && <ArrowDownRight className="w-3 h-3" />}
               {stat.change} 
-              <span className="text-slate-400 font-normal ml-1">vs last week</span>
+              <span className="text-slate-300 font-bold ml-1 italic lowercase">vs L7D</span>
             </div>
           </div>
         ))}
